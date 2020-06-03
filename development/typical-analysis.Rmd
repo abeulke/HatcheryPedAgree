@@ -12,29 +12,34 @@ output:
 library(tidyverse)
 library(HatcheryPedAgree)
 
+
 rrsh_genotypes <- read_rds("../private/rrsh_genotypes.rds")
 rrsh_metadata <- read_rds("../private/rrsh_metadata.rds")
+```
 
+```{r}
 # for illustration, make data set smaller by choosing fish from 2010 to 2014
-meta <- rrsh_metadata %>%
-  filter(year >= 2010 & year <=  2014)
-genos <- rrsh_genotypes %>%
-  semi_join(meta, by = "indiv")
+#meta <- rrsh_metadata %>%
+#  filter(year >= 2010 & year <=  2014)
+#genos <- rrsh_genotypes %>%
+#  semi_join(meta, by = "indiv")
 
 # first time through, just get the distribution of matching proportions
-for_histo <- find_matching_samples(genos, min_frac_matching = 0.8)
+for_histo <- find_matching_samples(rrsh_genotypes, min_frac_matching = 0.8)
 
 # check the distribution
 for_histo$pairs %>%
   mutate(frac_match = num_match / num_non_miss) %>%
   ggplot(aes(x = frac_match)) +
-  geom_histogram()
+  geom_histogram()+
+  scale_x_continuous(breaks = seq(0.80,1.0,0.01))
 
 # get the clusters of matching genotypes each indvidual belongs to
-for_real <- find_matching_samples(genos, min_frac_matching = 0.95, return_clusters = TRUE)
-
+for_real <- find_matching_samples(rrsh_genotypes, min_frac_matching = 0.95, return_clusters = TRUE)
+for_real_97 <- find_matching_samples(rrsh_genotypes, min_frac_matching = 0.97, return_clusters = TRUE)
 # we will end up using the identified clusters
-head(for_real$clusters)
+for_real$clusters
+for_real_97$clusters
 ```
 
 
@@ -52,9 +57,15 @@ genotypes and also the meta data into `snppit_genos` and `snppit_meta` (as well 
 components).
 ```{r}
 reorg <- reorganize_matching_samples(
-  genotypes = genos, 
-  metadata = meta, 
+  genotypes = rrsh_genotypes, 
+  metadata = rrsh_metadata, 
   clusters = for_real$clusters
+)
+
+reorg97 <- reorganize_matching_samples(
+  genotypes = rrsh_genotypes, 
+  metadata = rrsh_metadata, 
+  clusters = for_real_97$clusters
 )
 ```
 
@@ -67,6 +78,7 @@ were named on input, and column `new_id` shows the ID used to identify them now 
 SNPPIT-ready output.
 ```{r}
 reorg$matchers_metadata
+reorg97$matchers_metadata
 ```
 
 ### `snppit_meta` and `snppit_genos`
@@ -81,6 +93,7 @@ A tibble that shows you which clusters of matching genotypes included fish from 
 than one hatchery.
 ```{r}
 reorg$cross_hatchery_matches
+reorg97$cross_hatchery_matches
 ```
 
 ### `cross_sex_matches` 
@@ -89,6 +102,7 @@ A tibble that shows you which clusters of matching genotypes included fish with 
 one reported sex
 ```{r}
 reorg$cross_sex_matches
+reorg97$cross_sex_matches
 ```
 
 
@@ -102,8 +116,23 @@ and then it runs `snppit` inside the `system()` command.
 Here is what that looks like:
 ```{r}
 snppit_dir1 <- run_snppit(reorg$snppit_genos, reorg$snppit_meta)
+snppit_dir1_97 <- run_snppit(reorg97$snppit_genos, reorg97$snppit_meta)
+snppit_dir1
+snppit_dir1_97
 ```
 
 
+```{r}
+results_97_sad <- slurp_snppit("~/Desktop/", reorg97$snppit_meta)
+
+filter97 <- results_97_sad %>% 
+  filter(MaxP.Pr.Relat == "C_Se_Se") %>% 
+  arrange(FDR) %>% 
+  mutate(idx = 1:n())
+
+ggplot(filter97, aes(x= idx, y = FDR))+
+  geom_point()
+  
+```
 
 
