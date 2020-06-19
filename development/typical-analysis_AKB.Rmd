@@ -1,0 +1,214 @@
+---
+title: "Typical Analysis and Testing..."
+output: 
+  html_notebook:
+    toc: true
+---
+
+
+## Matching samples
+
+```{r}
+library(tidyverse)
+library(HatcheryPedAgree)
+
+
+rrsh_genotypes <- read_rds("../private/rrsh_genotypes.rds")
+rrsh_metadata <- read_rds("../private/rrsh_metadata.rds")
+```
+
+```{r}
+# for illustration, make data set smaller by choosing fish from 2010 to 2014
+#meta <- rrsh_metadata %>%
+#  filter(year >= 2010 & year <=  2014)
+#genos <- rrsh_genotypes %>%
+#  semi_join(meta, by = "indiv")
+
+# first time through, just get the distribution of matching proportions
+for_histo <- find_matching_samples(rrsh_genotypes, min_frac_matching = 0.8)
+
+# check the distribution
+for_histo$pairs %>%
+  mutate(frac_match = num_match / num_non_miss) %>%
+  ggplot(aes(x = frac_match)) +
+  geom_histogram()+
+  scale_x_continuous(breaks = seq(0.80,1.0,0.01))
+
+# get the clusters of matching genotypes each indvidual belongs to
+for_real <- find_matching_samples(rrsh_genotypes, min_frac_matching = 0.95, return_clusters = TRUE)
+for_real_97 <- find_matching_samples(rrsh_genotypes, min_frac_matching = 0.97, return_clusters = TRUE)
+# we will end up using the identified clusters
+for_real$clusters
+for_real_97$clusters
+```
+
+
+
+## Reorganizing for SNPPIT
+
+At this point, `for_real$clusters` is the tibble we need to re-organize our genotypes and meta-data
+for SNPPIT.  For every cluster of matching samples we will use, as the genotype, the
+sample with the least missing data.  We will also use the sex of that individual (sometimes
+there are mismatches in the sex of the matching genotypes).  Sometimes there are mismatches in
+the hatchery of the matching genotypes.  In those cases, each separate hatchery gets its own
+canonical individual named as the ID of the main canonical individual with the hatchery
+name appended to it.  The following function takes care of this and reorganizes both the
+genotypes and also the meta data into `snppit_genos` and `snppit_meta` (as well as a few other list
+components).
+```{r}
+reorg <- reorganize_matching_samples(
+  genotypes = rrsh_genotypes, 
+  metadata = rrsh_metadata, 
+  clusters = for_real$clusters
+)
+
+reorg97 <- reorganize_matching_samples(
+  genotypes = rrsh_genotypes, 
+  metadata = rrsh_metadata, 
+  clusters = for_real_97$clusters
+)
+```
+
+Let's have a look at some of the different components of that output.
+
+### `matchers_metadata`
+
+This is the meta data for all the matching genotypes.  Column `original_id` shows what they
+were named on input, and column `new_id` shows the ID used to identify them now in the
+SNPPIT-ready output.
+```{r}
+reorg$matchers_metadata
+reorg97$matchers_metadata
+```
+
+### `snppit_meta` and `snppit_genos`
+
+These are the tibbles that are ready to pass into `prepare_snppit_infile()`.  Multiple
+years and spawner_groups of the matching individuals have been lumped into
+comma-separated strings for the year and spawner group inputs to SNPPIT.
+
+### `cross_hatchery_matches` 
+
+A tibble that shows you which clusters of matching genotypes included fish from more
+than one hatchery.
+```{r}
+reorg$cross_hatchery_matches
+reorg97$cross_hatchery_matches
+```
+
+### `cross_sex_matches` 
+
+A tibble that shows you which clusters of matching genotypes included fish with more than
+one reported sex
+```{r}
+reorg$cross_sex_matches
+reorg97$cross_sex_matches
+```
+
+
+## Prepare a SNPPIT infile and run it
+
+We have rolled these two steps into a single run_snppit() function.
+
+Internally, it calls `prepare_snppit_infile()` to write the data,
+and then it runs `snppit` inside the `system()` command.
+
+Here is what that looks like:
+```{r}
+snppit_dir1 <- run_snppit(reorg$snppit_genos, reorg$snppit_meta)
+snppit_dir1_97 <- run_snppit(reorg97$snppit_genos, reorg97$snppit_meta)
+snppit_dir1
+snppit_dir1_97
+```
+
+
+```{r}
+results_97_sad <- slurp_snppit(snppit_dir1_97, reorg97$snppit_meta)
+results_95_sad <- slurp_snppit(snppit_dir1, reorg$snppit_meta) 
+
+write_rds(results_97_sad, path = "../outputs/RR_97_SAD_results.rds", compress = "xz")
+write_rds(results_95_sad, path = "../outputs/RR_95_SAD_results.rds", compress = "xz")
+
+
+filter97 <- results_97_sad %>% 
+  filter(MaxP.Pr.Relat == "C_Se_Se") %>% 
+  arrange(FDR) %>% 
+  mutate(idx = 1:n())
+
+ggplot(filter97, aes(x= idx, y = FDR))+
+  geom_point()
+  
+```
+
+
+## Then do an unconstrained or "noSAD" run
+
+```{r}
+snppit_dir_97_noSAD <- run_snppit(
+  reorg97$snppit_genos, 
+  reorg97$snppit_meta, 
+  use_spawner_group = FALSE,
+  use_sex = FALSE
+  )
+RR_97_no_SAD_results <- slurp_snppit(snppit_dir_97_noSAD, reorg97$snppit_meta)
+write_rds(RR_97_no_SAD_results, path = "../outputs/RR_97_no_SAD_results.rds", compress = "xz")
+
+filter_nosad <- RR_97_no_SAD_results %>% 
+  filter(MaxP.Pr.Relat == "C_Se_Se") %>% 
+  arrange(FDR) %>% 
+  mutate(idx = 1:n())
+
+
+nosad <- RR_97_no_SAD_results %>% 
+  arrange(FDR) %>% 
+  mutate(idx = 1:n()) %>% 
+  mutate(Kid_Ma_Pa = stringr::str_c(kid,ma,pa, sep = "_")) %>% 
+  mutate(Kid_Pa_Ma = stringr::str_c(kid,pa,ma, sep = "_")) %>% 
+  arrange(kid)
+  
+
+sad <- results_97_sad %>% 
+  arrange(FDR) %>% 
+  mutate(idx = 1:n()) %>% 
+  mutate(Kid_Ma_Pa = stringr::str_c(kid,ma,pa, sep = "_")) %>% 
+  arrange(kid)
+```
+```{r}
+
+RRdiff <- sad %>% mutate(Compare = ifelse(((sad$Kid_Ma_Pa == nosad$Kid_Pa_Ma) | (sad$Kid_Ma_Pa == nosad$Kid_Ma_Pa)), yes = "Same", no = "Different"))
+
+diff_un <- nosad %>% mutate(Compare = ifelse(((sad$Kid_Ma_Pa == nosad$Kid_Pa_Ma) | (sad$Kid_Ma_Pa == nosad$Kid_Ma_Pa)), yes = "Same", no = "Different"))
+diff_un_rename <- rename_at(diff_un, vars(-kid), function(x) paste0(x,"_unconstrained"))
+diff_un_rename
+comparison <- inner_join(RRdiff, diff_un_rename, "kid")
+comparison
+comp_filt <- comparison %>% filter(MaxP.Pr.Relat == "C_Se_Se" |MaxP.Pr.Relat_unconstrained == "C_Se_Se") 
+comp_filt$FDR <- as.numeric(as.character(comp_filt$FDR))
+comp_filt$FDR_unconstrained <- as.numeric(as.character(comp_filt$FDR_unconstrained))
+comp_filt
+comp_filter <- comp_filt %>% filter(FDR <= 0.01 | FDR_unconstrained <= 0.01)
+comp_filter
+comp_1 <- comp_filter %>% separate(pa_unconstrained, c("PaUn_ID", "PaUn_Sex", "PaUn_Year", "PaUn_Date", "PaUn_Hatchery"), sep = "_") %>% separate(ma_unconstrained, c("MaUn_ID", "MaUn_Sex", "MaUn_Year", "MaUn_Date", "MaUn_Hatchery"), sep = "_")
+comp_1
+
+i <-  1:10437 #number of samples in comp_1
+comp_2 <- comp_1 %>% mutate(Un_Same_Sex = ifelse(PaUn_Sex[i] == MaUn_Sex[i], yes = "Same Sex Parents", no ="NA"))
+library(lubridate)
+comp_3a <- comp_2 %>% mutate(PaUn_Date = mdy(PaUn_Date)) %>% mutate(MaUn_Date = mdy(MaUn_Date))
+comp_3b <- comp_3a %>% mutate(Un_Diff_Spawn_Date = ifelse(PaUn_Date[i] != MaUn_Date[i], yes = "Different Spawn Dates", no = "Same"))
+comp_4 <- comp_3b %>% mutate(Un_Diff_Hatchery = ifelse(PaUn_Hatchery[i] != MaUn_Hatchery[i], yes = "Parents from Different Hatcheries", no = "Same Hatchery"))
+comp_5 <- comp_4 %>% mutate(Un_Diff_SpawnYear = ifelse(PaUn_Year[i] != MaUn_Year[i], yes = "Different Spawn Years", no = "Same Spawn Year"))
+
+comp_5
+```
+
+```{r}
+filter(comp_5, Compare == "Different")
+```
+
+```{r}
+ggplot(data = comparison)+
+  geom_point(aes(x=idx_unconstrained, y = FDR), color = "red")+
+  geom_point(aes(x=idx_unconstrained, y = FDR_unconstrained), color = "blue")
+```
+
