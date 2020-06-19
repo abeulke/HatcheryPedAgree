@@ -188,16 +188,15 @@ comp_filt$FDR_unconstrained <- as.numeric(as.character(comp_filt$FDR_unconstrain
 comp_filt
 comp_filter <- comp_filt %>% filter(FDR <= 0.01 | FDR_unconstrained <= 0.01)
 comp_filter
-comp_1 <- comp_filter %>% separate(pa_unconstrained, c("PaUn_ID", "PaUn_Sex", "PaUn_Year", "PaUn_Date", "PaUn_Hatchery"), sep = "_") %>% separate(ma_unconstrained, c("MaUn_ID", "MaUn_Sex", "MaUn_Year", "MaUn_Date", "MaUn_Hatchery"), sep = "_")
-comp_1
 
-i <-  1:10437 #number of samples in comp_1
-comp_2 <- comp_1 %>% mutate(Un_Same_Sex = ifelse(PaUn_Sex[i] == MaUn_Sex[i], yes = "Same Sex Parents", no ="NA"))
+i <-  1:10437 #number of samples in comp_filter
+comp_2 <- comp_filter %>% mutate(Un_Same_Sex = ifelse(pa_sex_unconstrained[i] == ma_sex_unconstrained[i], yes = "Same Sex Parents", no ="NA"))
 library(lubridate)
-comp_3a <- comp_2 %>% mutate(PaUn_Date = mdy(PaUn_Date)) %>% mutate(MaUn_Date = mdy(MaUn_Date))
-comp_3b <- comp_3a %>% mutate(Un_Diff_Spawn_Date = ifelse(PaUn_Date[i] != MaUn_Date[i], yes = "Different Spawn Dates", no = "Same"))
-comp_4 <- comp_3b %>% mutate(Un_Diff_Hatchery = ifelse(PaUn_Hatchery[i] != MaUn_Hatchery[i], yes = "Parents from Different Hatcheries", no = "Same Hatchery"))
-comp_5 <- comp_4 %>% mutate(Un_Diff_SpawnYear = ifelse(PaUn_Year[i] != MaUn_Year[i], yes = "Different Spawn Years", no = "Same Spawn Year"))
+comp_3a <- comp_2 %>% mutate(pa_sg_unconstrained = mdy(pa_sg_unconstrained)) %>% mutate(ma_sg_unconstrained = mdy(ma_sg_unconstrained))
+comp_3b <- comp_3a %>% mutate(Un_Diff_Spawn_Date = ifelse(pa_sg_unconstrained[i] != ma_sg_unconstrained[i], yes = "Different Spawn Dates", no = "Same"))
+comp_4 <- comp_3b %>% mutate(Un_Diff_Hatchery = ifelse(pa_hatchery_unconstrained
+[i] != ma_hatchery_unconstrained[i], yes = "Parents from Different Hatcheries", no = "Same Hatchery"))
+comp_5 <- comp_4 %>% mutate(Un_Diff_SpawnYear = ifelse(pa_year_unconstrained[i] != ma_year_unconstrained[i], yes = "Different Spawn Years", no = "Same Spawn Year"))
 
 comp_5
 ```
@@ -208,6 +207,10 @@ filter(comp_5, Compare == "Different")
 
 ```{r}
 ggplot(data = comparison)+
+  geom_point(aes(x=idx_unconstrained, y = FDR), color = "red")+
+  geom_point(aes(x=idx_unconstrained, y = FDR_unconstrained), color = "blue")
+
+ggplot(data = comp_5)+
   geom_point(aes(x=idx_unconstrained, y = FDR), color = "red")+
   geom_point(aes(x=idx_unconstrained, y = FDR_unconstrained), color = "blue")
 ```
