@@ -152,11 +152,13 @@ snppit_dir_97_noSAD <- run_snppit(
   )
 RR_97_no_SAD_results <- slurp_snppit(snppit_dir_97_noSAD, reorg97$snppit_meta)
 write_rds(RR_97_no_SAD_results, path = "../outputs/RR_97_no_SAD_results.rds", compress = "xz")
+RR_97_no_SAD_results <- read_rds(path = "../outputs/RR_97_no_SAD_results.rds")
 
 filter_nosad <- RR_97_no_SAD_results %>% 
   filter(MaxP.Pr.Relat == "C_Se_Se") %>% 
   arrange(FDR) %>% 
   mutate(idx = 1:n())
+
 
 
 nosad <- RR_97_no_SAD_results %>% 
@@ -165,20 +167,30 @@ nosad <- RR_97_no_SAD_results %>%
   mutate(Kid_Ma_Pa = stringr::str_c(kid,ma,pa, sep = "_")) %>% 
   mutate(Kid_Pa_Ma = stringr::str_c(kid,pa,ma, sep = "_")) %>% 
   arrange(kid)
-  
 
+write_rds(nosad, path = "../outputs/noSad.rds", compress = "xz")
+
+results_97_sad <- read_rds(path = "../outputs/RR_97_SAD_results.rds")
+results_97_sad$ma <- replace_na(results_97_sad$ma, "xyz")
+results_97_sad$pa <- replace_na(results_97_sad$pa, "zyx")
+  
 sad <- results_97_sad %>% 
   arrange(FDR) %>% 
   mutate(idx = 1:n()) %>% 
   mutate(Kid_Ma_Pa = stringr::str_c(kid,ma,pa, sep = "_")) %>% 
   arrange(kid)
+
+write_rds(sad, path = "../outputs/Sad.rds", compress = "xz")
+  
 ```
+
 ```{r}
 
 RRdiff <- sad %>% mutate(Compare = ifelse(((sad$Kid_Ma_Pa == nosad$Kid_Pa_Ma) | (sad$Kid_Ma_Pa == nosad$Kid_Ma_Pa)), yes = "Same", no = "Different"))
 
 diff_un <- nosad %>% mutate(Compare = ifelse(((sad$Kid_Ma_Pa == nosad$Kid_Pa_Ma) | (sad$Kid_Ma_Pa == nosad$Kid_Ma_Pa)), yes = "Same", no = "Different"))
 diff_un_rename <- rename_at(diff_un, vars(-kid), function(x) paste0(x,"_unconstrained"))
+
 diff_un_rename
 comparison <- inner_join(RRdiff, diff_un_rename, "kid")
 comparison
@@ -198,20 +210,28 @@ comp_4 <- comp_3b %>% mutate(Un_Diff_Hatchery = ifelse(pa_hatchery_unconstrained
 [i] != ma_hatchery_unconstrained[i], yes = "Parents from Different Hatcheries", no = "Same Hatchery"))
 comp_5 <- comp_4 %>% mutate(Un_Diff_SpawnYear = ifelse(pa_year_unconstrained[i] != ma_year_unconstrained[i], yes = "Different Spawn Years", no = "Same Spawn Year"))
 
-comp_5
+View(comp_5)
 ```
 
 ```{r}
 filter(comp_5, Compare == "Different")
+
+filter(comparison, Compare == "Different")
+
 ```
 
 ```{r}
 ggplot(data = comparison)+
   geom_point(aes(x=idx_unconstrained, y = FDR), color = "red")+
-  geom_point(aes(x=idx_unconstrained, y = FDR_unconstrained), color = "blue")
+  geom_point(aes(x=idx_unconstrained, y = FDR_unconstrained), color = "blue")+
+  geom_hline(yintercept = 0.01,color = "black")
 
 ggplot(data = comp_5)+
   geom_point(aes(x=idx_unconstrained, y = FDR), color = "red")+
-  geom_point(aes(x=idx_unconstrained, y = FDR_unconstrained), color = "blue")
+  geom_point(aes(x=idx_unconstrained, y = FDR_unconstrained), color = "blue")+
+  geom_hline(yintercept = 0.01,color = "black")
+```
+```{r}
+write_rds(comp_5, path = "../outputs/Sad_noSad_comp5.rds", compress = "xz")
 ```
 
