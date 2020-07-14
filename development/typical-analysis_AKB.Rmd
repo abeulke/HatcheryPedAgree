@@ -233,5 +233,12 @@ ggplot(data = comp_5)+
 ```
 ```{r}
 write_rds(comp_5, path = "../outputs/Sad_noSad_comp5.rds", compress = "xz")
+write_rds(comparison, path = "../outputs/Sad_noSad_comparison_nofilter.rds", compress = "xz")
+```
+
+want to make a sad/nosad comparison that isn't filtered so I can look at the FDR levels of the trios in my RRdata final set that I've been using
+Looks like I already have this, I just need to use the "comparison" dataset
+```{r}
+
 ```
 
