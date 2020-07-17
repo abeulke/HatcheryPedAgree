@@ -124,7 +124,7 @@ additional_no_sads_05_info <- D3 %>%
     MaxP.Pr.Relat == "C_Se_Se"
     ) 
 
-final_data_to_test <- full_join(all_good_sads_info, additional_no_sads_05_info, by = "kid")
+final_data_to_test <- bind_rows(all_good_sads_info, additional_no_sads_05_info)
 write_rds(final_data_to_test, "../outputs/HPA_final_data_test_July132020.rds")
 
 ```
