@@ -129,3 +129,85 @@ write_rds(final_data_to_test, "../outputs/HPA_final_data_test_July132020.rds")
 
 ```
 
+Things to concider adding to the package: 
+The steps above to pick the final dataset and then...
+```{r}
+#add script similar to what is below to correct ma/pa that are in the wrong column because of unconstrained snppit results not knowning their sexes
+#also code to add a column for spawn date converted to day of year
+#also code to add a column for age
+library(tidyverse)
+test_data <- read_rds("~/Documents/Git/forks/HatcheryPedAgree/outputs/HPA_final_data_test_July132020.rds") %>% mutate(Kid_Age = kid_year - SpawnYear)
+test_data
+
+test_data$ma_year <- as.character(test_data$ma_year)
+test_data$pa_year <- as.character(test_data$pa_year)
+
+test_data_corrected_sexes <- test_data %>%
+  mutate(new_ma = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ ma, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ pa,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   ) %>% 
+  mutate(new_pa = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ pa, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ ma,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   ) %>% 
+   mutate(new_ma_sg = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ ma_sg, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ pa_sg,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   ) %>% 
+  mutate(new_pa_sg = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ pa_sg, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ ma_sg,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   ) %>% 
+   mutate(new_ma_hatchery = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ ma_hatchery, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ pa_hatchery,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   ) %>% 
+  mutate(new_pa_hatchery = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ pa_hatchery, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ ma_hatchery,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   )  %>% 
+   mutate(new_ma_year = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ ma_year, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ pa_year,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   ) %>% 
+  mutate(new_pa_year = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ pa_year, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ ma_year,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   )  %>% 
+   mutate(new_ma_sex = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ ma_sex, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ pa_sex,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   ) %>% 
+  mutate(new_pa_sex = case_when(
+     ma_sex == "Female"  & pa_sex == "Male" ~ pa_sex, 
+     ma_sex == "Male"  & pa_sex == "Female" ~ ma_sex,
+     ma_sex == pa_sex ~ "Parental_sex_conflict")
+   ) 
+
+View(test_data_corrected_sexes)
+```
+
+
+Need to change dates to day of year
+```{r}
+library(lubridate)
+test_data_corrected_sexes$kid_sg <- mdy(test_data$kid_sg) 
+test_data_corrected_sexes$new_ma_sg <- mdy(test_data$ma_sg) 
+test_data_corrected_sexes$new_pa_sg <- mdy(test_data$pa_sg) 
+test_data_corrected_sexes_c <- test_data_corrected_sexes %>%
+  mutate(kid_dayofyear = (strftime(kid_sg, format = "%j"))) %>% 
+  mutate(ma_dayofyear = (strftime(new_ma_sg, format = "%j"))) %>% 
+  mutate(pa_dayofyear = (strftime(new_pa_sg, format = "%j")))
+```
+```
+
