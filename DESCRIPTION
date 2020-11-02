@@ -10,11 +10,12 @@ License: What license is it under?
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
 Depends:
     R (>= 3.5.0)
 Imports: 
     dplyr,
+    ggraph,
     ggplot2,
     glue,
     igraph,
@@ -26,6 +27,7 @@ Imports:
     rubias,
     stringr,
     tibble,
+    tidygraph,
     tidyr
 Suggests: 
     knitr,

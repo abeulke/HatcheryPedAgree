@@ -4,11 +4,15 @@
 #' join.  So, if it turns out that we are requsting the addition of individuals
 #' that are not in `G`, this will throw an error.
 #'
+#' This function is called within [run_snippit()].
+#'
 #' @param G a long format data frame of SNPs.  It must have, at a minimum, the columns
 #'   `indiv`, `locus`, `gene_copy`, `allele_int`.  Missing data should be represented as
 #'   NA.
 #' @param S a data frame of meta data with the columns `indiv`, `year`, `sex`, `spawner_group`,
 #' and `hatchery`
+#' @return Function does not return a value of any importance.
+#' The side effect of the function is to write out a snppit input file!
 #' @export
 #' @examples
 #' prepare_snppit_infile(G = coho_genotypes, S = coho_metadata)
@@ -25,6 +29,10 @@ prepare_snppit_infile <- function(G,
   sex_col <- "POPCOLUMN_SEX"
   spawn_group_col <- "POPCOLUMN_SPAWN_GROUP"
 
+
+  if(any(is.na(S$year))) {
+    stop("Missing data not allowed in the year column of S")
+  }
 
   # first, make a genotype matrix. Put spaces between the gene copies in a locus
   M <- G %>%
